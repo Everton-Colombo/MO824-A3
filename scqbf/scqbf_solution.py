@@ -4,4 +4,4 @@ from typing import List, Set
 @dataclass
 class ScQbfSolution:
     elements: List[int]
-    _last_objfun_val: float = 0
+    _objfun_val: float = None
