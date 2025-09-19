@@ -21,6 +21,7 @@ class ScQbfTS():
         self.current_solution: ScQbfSolution = None
 
         # Termination criteria properties
+        self._prev_best_solution = None
         self.max_iter = max_iter
         self.time_limit_secs = time_limit_secs
         self.patience = patience
@@ -49,12 +50,14 @@ class ScQbfTS():
             if self._no_improvement_iter >= self.patience:
                 self.stop_reason = "patience_exceeded"
                 return True
-            elif self.best_solution is not None and self.current_solution is not None:
-                if self.evaluator.evaluate_objfun(self.current_solution) > self.evaluator.evaluate_objfun(self.best_solution):
+            elif self.best_solution is not None and self.current_solution is not None and self._prev_best_solution is not None:
+                if self.evaluator.evaluate_objfun(self.current_solution) <= self.evaluator.evaluate_objfun(self._prev_best_solution):
                     self._no_improvement_iter += 1
                 else:
                     self._no_improvement_iter = 0
-        
+
+        self._prev_best_solution = self.best_solution
+
         return False
     
     def _do_iteration_internal_actions(self):
