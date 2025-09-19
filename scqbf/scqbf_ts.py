@@ -110,9 +110,13 @@ class ScQbfTS():
             aspiration_criterion = current_objfun_val + delta > best_objfun_val
             if cand_in not in self.tabu_list or aspiration_criterion:
                 if delta > best_delta:
-                    best_delta = delta
-                    best_cand_in = cand_in
-                    best_cand_out = None
+                    # Check if removing this element would break feasibility
+                    temp_sol = ScQbfSolution(solution.elements.copy())
+                    temp_sol.elements.remove(cand_out)
+                    if self.evaluator.is_solution_valid(temp_sol):
+                        best_delta = delta
+                        best_cand_in = None
+                        best_cand_out = cand_out
         
         # Evaluate removals
         for cand_out in solution.elements:
@@ -121,9 +125,13 @@ class ScQbfTS():
             aspiration_criterion = current_objfun_val + delta > best_objfun_val
             if cand_out not in self.tabu_list or aspiration_criterion:
                 if delta > best_delta:
-                    best_delta = delta
-                    best_cand_in = None
-                    best_cand_out = cand_out
+                    # Check if removing this element would break feasibility
+                    temp_sol = ScQbfSolution(solution.elements.copy())
+                    temp_sol.elements.remove(cand_out)
+                    if self.evaluator.is_solution_valid(temp_sol):
+                        best_delta = delta
+                        best_cand_in = None
+                        best_cand_out = cand_out
         
         # Evaluate exchanges
         for cand_in in cl:
@@ -133,9 +141,13 @@ class ScQbfTS():
                 aspiration_criterion = current_objfun_val + delta > best_objfun_val
                 if (cand_in not in self.tabu_list and cand_out not in self.tabu_list) or aspiration_criterion:
                     if delta > best_delta:
-                        best_delta = delta
-                        best_cand_in = cand_in
-                        best_cand_out = cand_out
+                        # Check if removing this element would break feasibility
+                        temp_sol = ScQbfSolution(solution.elements.copy())
+                        temp_sol.elements.remove(cand_out)
+                        if self.evaluator.is_solution_valid(temp_sol):    
+                            best_delta = delta
+                            best_cand_in = cand_in
+                            best_cand_out = cand_out
         
         new_solution = ScQbfSolution(solution.elements.copy())
         
