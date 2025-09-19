@@ -4,6 +4,9 @@ from scqbf.scqbf_instance import *
 from scqbf.scqbf_evaluator import *
 import random
 import time
+from collections import deque
+
+PLACE_HOLDER = -1
 
 class ScQbfTS():
     
@@ -12,7 +15,7 @@ class ScQbfTS():
         # Problem-related properties
         self.instance = instance
         self.evaluator = ScQbfEvaluator(instance)
-        self.tenure = tenure
+        self.tabu_list = deque([PLACE_HOLDER] * tenure * 2, maxlen=tenure*2)  # Tabu list implemented as a deque with fixed max length
         self.best_solution: ScQbfSolution = None
         self.current_solution: ScQbfSolution = None
 
@@ -92,6 +95,63 @@ class ScQbfTS():
         return constructed_sol
 
     def _neighborhood_move(self, solution: ScQbfSolution) -> ScQbfSolution:
-        pass
+        best_delta = float('-inf')
+        best_cand_in = None
+        best_cand_out = None
+        
+        cl = [i for i in range(self.instance.n) if i not in solution.elements] 
+        current_objfun_val = self.evaluator.evaluate_objfun(solution)
+        best_objfun_val = self.evaluator.evaluate_objfun(self.best_solution)
+        
+        # Evaluate insertions
+        for cand_in in cl:
+            delta = self.evaluator.evaluate_insertion_delta(cand_in, solution) 
+            
+            aspiration_criterion = current_objfun_val + delta > best_objfun_val
+            if cand_in not in self.tabu_list or aspiration_criterion:
+                if delta > best_delta:
+                    best_delta = delta
+                    best_cand_in = cand_in
+                    best_cand_out = None
+        
+        # Evaluate removals
+        for cand_out in solution.elements:
+            delta = self.evaluator.evaluate_removal_delta(cand_out, solution)  
+            
+            aspiration_criterion = current_objfun_val + delta > best_objfun_val
+            if cand_out not in self.tabu_list or aspiration_criterion:
+                if delta > best_delta:
+                    best_delta = delta
+                    best_cand_in = None
+                    best_cand_out = cand_out
+        
+        # Evaluate exchanges
+        for cand_in in cl:
+            for cand_out in solution.elements:
+                delta = self.evaluator.evaluate_exchange_delta(cand_in, cand_out, solution)  
+                
+                aspiration_criterion = current_objfun_val + delta > best_objfun_val
+                if (cand_in not in self.tabu_list and cand_out not in self.tabu_list) or aspiration_criterion:
+                    if delta > best_delta:
+                        best_delta = delta
+                        best_cand_in = cand_in
+                        best_cand_out = cand_out
+        
+        new_solution = ScQbfSolution(solution.elements.copy())
+        
+        # Implement the best move and update tabu list
+        if best_cand_out is not None:
+            new_solution.elements.remove(best_cand_out)
+            self.tabu_list.append(best_cand_out)
+        else:
+            self.tabu_list.append(PLACE_HOLDER)
+        
+        if best_cand_in is not None:
+            new_solution.elements.append(best_cand_in)
+            self.tabu_list.append(best_cand_in)
+        else:
+            self.tabu_list.append(PLACE_HOLDER)
+        
+        return new_solution
     
         
