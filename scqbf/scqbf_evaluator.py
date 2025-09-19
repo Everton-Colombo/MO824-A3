@@ -127,5 +127,5 @@ class ScQbfEvaluator:
         
         return new_covered_count / domain_size
 
-    def is_solution_valid(self, solution: ScQbfSolution):
+    def is_solution_feasible(self, solution: ScQbfSolution):
         return self.evaluate_coverage(solution) == 1.0

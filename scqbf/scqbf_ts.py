@@ -68,8 +68,29 @@ class ScQbfTS():
         return self.best_solution
     
     def _constructive_heuristic(self) -> ScQbfSolution:
-        pass
-    
+        """
+        Very simple constructive heuristic. Adds elements that add coverage until solution is feasible.
+        """
+        
+        constructed_sol = ScQbfSolution([])
+        cl = [i for i in range(self.instance.n)]
+        random.shuffle(cl)
+        
+        while not self.evaluator.is_solution_feasible(constructed_sol):
+            rcl = [i for i in cl if i not in constructed_sol.elements 
+                      and self.evaluator.evaluate_insertion_delta_coverage(i, constructed_sol) > 0]
+
+            element = random.choice(rcl)
+            rcl.remove(element)
+            constructed_sol.elements.append(element)
+            
+            cl = rcl
+
+        if not self.evaluator.is_solution_feasible(constructed_sol):
+            raise ValueError("Constructive heuristic failed to produce a feasible solution")
+        
+        return constructed_sol
+
     def _neighborhood_move(self, solution: ScQbfSolution) -> ScQbfSolution:
         pass
     
