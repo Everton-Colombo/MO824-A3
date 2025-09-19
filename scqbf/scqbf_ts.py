@@ -10,7 +10,8 @@ PLACE_HOLDER = -1
 
 class ScQbfTS():
     
-    def __init__(self, instance: ScQbfInstance, tenure: int, max_iter: int = None, time_limit_secs: int = None, patience: int = None):
+    def __init__(self, instance: ScQbfInstance, tenure: int, max_iter: int = None, time_limit_secs: int = None, patience: int = None,
+                 debug: bool = False, save_history: bool = False):
         
         # Problem-related properties
         self.instance = instance
@@ -28,6 +29,11 @@ class ScQbfTS():
         self._no_improvement_iter = 0
         self.stop_reason: str = None
         
+        # Other
+        self.debug = debug
+        self.save_history = save_history
+        if self.save_history:
+            self.history = []
 
     def _eval_termination_condition(self) -> bool:
         """ Check if the termination condition is met, while also managing termination criteria properties."""
@@ -44,12 +50,19 @@ class ScQbfTS():
                 self.stop_reason = "patience_exceeded"
                 return True
             elif self.best_solution is not None and self.current_solution is not None:
-                if self.evaluator.evaluate_objfun(self.best_solution) > self.evaluator.evaluate_objfun(self.current_solution):
+                if self.evaluator.evaluate_objfun(self.current_solution) > self.evaluator.evaluate_objfun(self.best_solution):
                     self._no_improvement_iter += 1
                 else:
                     self._no_improvement_iter = 0
         
         return False
+    
+    def _do_iteration_internal_actions(self):
+        if self.debug:
+            print(f"Iteration {self._iter}: Best ObjFun = {self.evaluator.evaluate_objfun(self.best_solution)}, Current ObjFun = {self.evaluator.evaluate_objfun(self.current_solution)}")
+
+        if self.save_history:
+            self.history.append((self._iter, self.evaluator.evaluate_objfun(self.best_solution), self.evaluator.evaluate_objfun(self.current_solution)))
     
     def solve(self) -> ScQbfSolution:
         self.best_solution = self._constructive_heuristic()
@@ -61,6 +74,8 @@ class ScQbfTS():
         self._start_time = time.time()
         self._iter = 0
         while not self._eval_termination_condition():
+            self._do_iteration_internal_actions()
+            
             self.current_solution = self._neighborhood_move(self.current_solution)
             current_solution_objfun_val = self.evaluator.evaluate_objfun(self.current_solution)
 
@@ -110,13 +125,9 @@ class ScQbfTS():
             aspiration_criterion = current_objfun_val + delta > best_objfun_val
             if cand_in not in self.tabu_list or aspiration_criterion:
                 if delta > best_delta:
-                    # Check if removing this element would break feasibility
-                    temp_sol = ScQbfSolution(solution.elements.copy())
-                    temp_sol.elements.remove(cand_out)
-                    if self.evaluator.is_solution_valid(temp_sol):
-                        best_delta = delta
-                        best_cand_in = None
-                        best_cand_out = cand_out
+                    best_delta = delta
+                    best_cand_in = cand_in
+                    best_cand_out = None
         
         # Evaluate removals
         for cand_out in solution.elements:
@@ -128,7 +139,7 @@ class ScQbfTS():
                     # Check if removing this element would break feasibility
                     temp_sol = ScQbfSolution(solution.elements.copy())
                     temp_sol.elements.remove(cand_out)
-                    if self.evaluator.is_solution_valid(temp_sol):
+                    if self.evaluator.is_solution_feasible(temp_sol):
                         best_delta = delta
                         best_cand_in = None
                         best_cand_out = cand_out
@@ -143,8 +154,9 @@ class ScQbfTS():
                     if delta > best_delta:
                         # Check if removing this element would break feasibility
                         temp_sol = ScQbfSolution(solution.elements.copy())
+                        temp_sol.elements.append(cand_in)
                         temp_sol.elements.remove(cand_out)
-                        if self.evaluator.is_solution_valid(temp_sol):    
+                        if self.evaluator.is_solution_feasible(temp_sol):
                             best_delta = delta
                             best_cand_in = cand_in
                             best_cand_out = cand_out
