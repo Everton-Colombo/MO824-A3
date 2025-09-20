@@ -143,7 +143,11 @@ class ScQbfTS():
         best_cand_in = None
         best_cand_out = None
         
-        cl = [i for i in range(self.instance.n) if i not in solution.elements] 
+        cl = [i for i in range(self.instance.n) if i not in solution.elements]
+        random.shuffle(cl)
+        if self.config.probabilistic_ts:
+            cl = random.sample(cl, max(1, int(len(cl) * self.config.probabilistic_param)))
+
         current_objfun_val = self.evaluator.evaluate_objfun(solution)
         best_objfun_val = self.evaluator.evaluate_objfun(self.best_solution)
         
@@ -211,7 +215,11 @@ class ScQbfTS():
         selected_cand_in = None
         selected_cand_out = None
         
-        cl = [i for i in range(self.instance.n) if i not in solution.elements] 
+        cl = [i for i in range(self.instance.n) if i not in solution.elements]
+        random.shuffle(cl)
+        if self.config.probabilistic_ts:
+            cl = random.sample(cl, max(1, int(len(cl) * self.config.probabilistic_param)))
+        
         current_objfun_val = self.evaluator.evaluate_objfun(solution)
         best_objfun_val = self.evaluator.evaluate_objfun(self.best_solution)
         
