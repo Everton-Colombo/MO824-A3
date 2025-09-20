@@ -9,20 +9,34 @@ from typing import Literal
 
 PLACE_HOLDER = -1
 
+class TSConfig():
+    def __init__(self, tenure: int, search_strategy: Literal['first', 'best'] = 'first',
+                 probabilistic_ts: bool = False, probabilistic_param: float = 0.8):
+        """
+        Configuration data class for the Tabu Search algorithm.
+        """
+        
+        
+        self.tenure = tenure
+        self.search_strategy = search_strategy
+        self.probabilistic_ts = probabilistic_ts
+        self.probabilistic_param = probabilistic_param
+        
+        if self.probabilistic_ts and not (0 < self.probabilistic_param < 1):
+            raise ValueError("Probabilistic parameter must be in the range (0, 1) when probabilistic TS is enabled.")
+
 class ScQbfTS():
     
-    def __init__(self, instance: ScQbfInstance, tenure: int, max_iter: int = None, time_limit_secs: int = None, patience: int = None,
-                 search_strategy: Literal['first', 'best'] = 'first', debug: bool = False, save_history: bool = False):
+    def __init__(self, instance: ScQbfInstance, ts_config: TSConfig, 
+                 max_iter: int = None, time_limit_secs: int = None, patience: int = None, debug: bool = False, save_history: bool = False):
         
         # TS-related properties
+        self.config = ts_config
         self.instance = instance
         self.evaluator = ScQbfEvaluator(instance)
-        self.tabu_list = deque([PLACE_HOLDER] * tenure * 2, maxlen=tenure*2)  # Tabu list implemented as a deque with fixed max length
+        self.tabu_list = deque([PLACE_HOLDER] * ts_config.tenure * 2, maxlen=ts_config.tenure*2)  # Tabu list implemented as a deque with fixed max length
         self.best_solution: ScQbfSolution = None
         self.current_solution: ScQbfSolution = None
-        
-        # Config properties
-        self.search_strategy = search_strategy 
 
         # Termination criteria properties
         self._prev_best_solution = None
@@ -117,19 +131,23 @@ class ScQbfTS():
         return constructed_sol
 
     def _neighborhood_move(self, solution: ScQbfSolution) -> ScQbfSolution:
-        if self.search_strategy == 'first':
+        if self.config.search_strategy == 'first':
             return self._neighborhood_move_first_improving(solution)
-        elif self.search_strategy == 'best':
+        elif self.config.search_strategy == 'best':
             return self._neighborhood_move_best_improving(solution)
         else:
-            raise ValueError(f"Unknown search strategy: {self.search_strategy}")
-        
+            raise ValueError(f"Unknown search strategy: {self.config.search_strategy}")
+
     def _neighborhood_move_best_improving(self, solution: ScQbfSolution) -> ScQbfSolution:
         best_delta = float('-inf')
         best_cand_in = None
         best_cand_out = None
         
-        cl = [i for i in range(self.instance.n) if i not in solution.elements] 
+        cl = [i for i in range(self.instance.n) if i not in solution.elements]
+        random.shuffle(cl)
+        if self.config.probabilistic_ts:
+            cl = random.sample(cl, max(1, int(len(cl) * self.config.probabilistic_param)))
+
         current_objfun_val = self.evaluator.evaluate_objfun(solution)
         best_objfun_val = self.evaluator.evaluate_objfun(self.best_solution)
         
@@ -197,7 +215,11 @@ class ScQbfTS():
         selected_cand_in = None
         selected_cand_out = None
         
-        cl = [i for i in range(self.instance.n) if i not in solution.elements] 
+        cl = [i for i in range(self.instance.n) if i not in solution.elements]
+        random.shuffle(cl)
+        if self.config.probabilistic_ts:
+            cl = random.sample(cl, max(1, int(len(cl) * self.config.probabilistic_param)))
+        
         current_objfun_val = self.evaluator.evaluate_objfun(solution)
         best_objfun_val = self.evaluator.evaluate_objfun(self.best_solution)
         
