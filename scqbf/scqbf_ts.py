@@ -10,7 +10,7 @@ from typing import Literal
 PLACE_HOLDER = -1
 
 class RestartIntensificationComponent():
-    def __init__(self, instance: ScQbfInstance, restart_patience: int = 100, max_fixed_elements: int = 3):
+    def __init__(self, instance: ScQbfInstance = None, restart_patience: int = 100, max_fixed_elements: int = 3):
         self._instance = instance
         
         self.recency_memory: List[int] = [0] * instance.n
@@ -80,6 +80,7 @@ class ScQbfTS():
         # Termination criteria properties
         self._prev_best_solution = None
         self.max_iter = max_iter
+        self.execution_time = 0
         self.time_limit_secs = time_limit_secs
         self.patience = patience
         self._iter = 0
@@ -97,10 +98,12 @@ class ScQbfTS():
         """ Check if the termination condition is met, while also managing termination criteria properties."""
 
         self._iter += 1
+        self.execution_time = time.time() - self._start_time
+        
         if self.max_iter is not None and self._iter >= self.max_iter:
             self.stop_reason = "max_iter"
             return True
-        if self.time_limit_secs is not None and (time.time() - self._start_time) >= self.time_limit_secs:
+        if self.time_limit_secs is not None and self.execution_time >= self.time_limit_secs:
             self.stop_reason = "time_limit"
             return True
         if self.patience is not None:
@@ -135,7 +138,7 @@ class ScQbfTS():
         self._iter = 0
         while not self._eval_termination_condition():
             self._do_iteration_internal_actions()
-
+            
             if self.config.ibr_component is not None and (self._no_improvement_iter + 1) % self.config.ibr_component.restart_patience == 0:
                 self._fixed_elements = self.config.ibr_component.get_attractive_elements()
                 self.current_solution = ScQbfSolution(self.best_solution.elements.copy())
