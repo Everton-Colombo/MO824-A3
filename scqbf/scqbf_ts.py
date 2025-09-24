@@ -9,10 +9,35 @@ from typing import Literal
 
 PLACE_HOLDER = -1
 
+class RestartIntensificationComponent():
+    def __init__(self, instance: ScQbfInstance, restart_patience: int = 100, max_fixed_elements: int = 3):
+        self._instance = instance
+        
+        self.recency_memory: List[int] = [0] * instance.n
+        self.restart_patience = restart_patience
+        self.max_fixed_elements = max_fixed_elements
+
+    def update_recency_memory(self, solution, iteration: int):
+        elements_in_solution = set(solution.elements)
+        elements_not_in_solution = set(range(self._instance.n)) - elements_in_solution
+        
+        for element in elements_in_solution:
+            self.recency_memory[element] += 1
+                
+        for element in elements_not_in_solution:
+            self.recency_memory[element] = 0
+        
+    def get_attractive_elements(self) -> List[int]:
+        # return a list of the most recurring elements (up to max_fixed_elements) that dont have a zero value in recency_memory
+        
+        sorted_elements = sorted(range(self._instance.n), key=lambda x: self.recency_memory[x], reverse=True)
+        return [element for element in sorted_elements if self.recency_memory[element] > 0][:self.max_fixed_elements]
+
+
 class TSConfig():
     def __init__(self, tenure: int, search_strategy: Literal['first', 'best'] = 'first',
                  probabilistic_ts: bool = False, probabilistic_param: float = 0.8,
-                 intensification_by_restart: bool = False, restart_patience: int = 100):
+                 ibr_component: RestartIntensificationComponent = None):
         """
         Configuration data class for the Tabu Search algorithm.
         
@@ -26,13 +51,8 @@ class TSConfig():
             Whether to use probabilistic tabu search. Default is False.
         probabilistic_param : float, optional
             The parameter for probabilistic tabu search, must be in (0, 1). Only used if probabilistic_ts is True. Default is 0.8.
-        intensification_by_restart : bool, optional
-            Whether to use intensification by restarting the search. Default is False.
-        restart_patience : int, optional
-            The number of iterations without improvement before a restart is triggered, if intensification_by_restart is True. Default is 100.
+                - 
         """
-        
-        
         self.tenure = tenure
         self.search_strategy = search_strategy
         
@@ -41,8 +61,7 @@ class TSConfig():
         if self.probabilistic_ts and not (0 < self.probabilistic_param < 1):
             raise ValueError("Probabilistic parameter must be in the range (0, 1) when probabilistic TS is enabled.")
         
-        self.intensification_by_restart = intensification_by_restart
-        self.restart_patience = restart_patience
+        self.ibr_component = ibr_component
 
 class ScQbfTS():
     
@@ -66,6 +85,10 @@ class ScQbfTS():
         self._start_time = None
         self._no_improvement_iter = 0
         self.stop_reason: str = None
+        
+        # Properties derived from config
+        if self.config.intensification_by_restart:
+            self.recent_memory = deque(maxlen=self.config.restart_patience)
         
         # Other
         self.debug = debug
