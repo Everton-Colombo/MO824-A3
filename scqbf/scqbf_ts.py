@@ -11,19 +11,38 @@ PLACE_HOLDER = -1
 
 class TSConfig():
     def __init__(self, tenure: int, search_strategy: Literal['first', 'best'] = 'first',
-                 probabilistic_ts: bool = False, probabilistic_param: float = 0.8):
+                 probabilistic_ts: bool = False, probabilistic_param: float = 0.8,
+                 intensification_by_restart: bool = False, restart_patience: int = 100):
         """
         Configuration data class for the Tabu Search algorithm.
+        
+        Parameters
+        ----------
+        tenure : int
+            The tenure (length) of the tabu list.
+        search_strategy : str, optional
+            The search strategy to use: 'first' for first-improving, 'best' for best-improving. Default is 'first'.
+        probabilistic_ts : bool, optional
+            Whether to use probabilistic tabu search. Default is False.
+        probabilistic_param : float, optional
+            The parameter for probabilistic tabu search, must be in (0, 1). Only used if probabilistic_ts is True. Default is 0.8.
+        intensification_by_restart : bool, optional
+            Whether to use intensification by restarting the search. Default is False.
+        restart_patience : int, optional
+            The number of iterations without improvement before a restart is triggered, if intensification_by_restart is True. Default is 100.
         """
         
         
         self.tenure = tenure
         self.search_strategy = search_strategy
+        
         self.probabilistic_ts = probabilistic_ts
         self.probabilistic_param = probabilistic_param
-        
         if self.probabilistic_ts and not (0 < self.probabilistic_param < 1):
             raise ValueError("Probabilistic parameter must be in the range (0, 1) when probabilistic TS is enabled.")
+        
+        self.intensification_by_restart = intensification_by_restart
+        self.restart_patience = restart_patience
 
 class ScQbfTS():
     
