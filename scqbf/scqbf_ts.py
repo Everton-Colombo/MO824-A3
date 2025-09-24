@@ -17,8 +17,8 @@ class RestartIntensificationComponent():
         self.restart_patience = restart_patience
         self.max_fixed_elements = max_fixed_elements
 
-    def update_recency_memory(self, solution, iteration: int):
-        elements_in_solution = set(solution.elements)
+    def update_recency_memory(self, best_solution: ScQbfSolution):
+        elements_in_solution = set(best_solution.elements)
         elements_not_in_solution = set(range(self._instance.n)) - elements_in_solution
         
         for element in elements_in_solution:
@@ -75,6 +75,7 @@ class ScQbfTS():
         self.tabu_list = deque([PLACE_HOLDER] * ts_config.tenure * 2, maxlen=ts_config.tenure*2)  # Tabu list implemented as a deque with fixed max length
         self.best_solution: ScQbfSolution = None
         self.current_solution: ScQbfSolution = None
+        self._fixed_elements: List[int] = []
 
         # Termination criteria properties
         self._prev_best_solution = None
@@ -85,10 +86,6 @@ class ScQbfTS():
         self._start_time = None
         self._no_improvement_iter = 0
         self.stop_reason: str = None
-        
-        # Properties derived from config
-        if self.config.intensification_by_restart:
-            self.recent_memory = deque(maxlen=self.config.restart_patience)
         
         # Other
         self.debug = debug
@@ -138,13 +135,23 @@ class ScQbfTS():
         self._iter = 0
         while not self._eval_termination_condition():
             self._do_iteration_internal_actions()
-            
+
+            if self.config.ibr_component is not None and (self._no_improvement_iter + 1) % self.config.ibr_component.restart_patience == 0:
+                self._fixed_elements = self.config.ibr_component.get_attractive_elements()
+                self.current_solution = ScQbfSolution(self.best_solution.elements.copy())
+                
+                if self.debug:
+                    print(f"Restarting with intensification at iteration {self._iter}. Fixed elements: {self._fixed_elements}.")
+
             self.current_solution = self._neighborhood_move(self.current_solution)
             current_solution_objfun_val = self.evaluator.evaluate_objfun(self.current_solution)
 
             if current_solution_objfun_val > best_solution_objfun_val:
                 self.best_solution = self.current_solution
                 best_solution_objfun_val = current_solution_objfun_val
+                
+                if self.config.ibr_component is not None:   # If Intensification by Restart is enabled
+                    self.config.ibr_component.update_recency_memory(self.best_solution)
 
         return self.best_solution
     
@@ -209,7 +216,7 @@ class ScQbfTS():
             delta = self.evaluator.evaluate_removal_delta(cand_out, solution)  
             
             aspiration_criterion = current_objfun_val + delta > best_objfun_val
-            if cand_out not in self.tabu_list or aspiration_criterion:
+            if (cand_out not in self.tabu_list and cand_out not in self._fixed_elements) and aspiration_criterion:
                 if delta > best_delta:
                     # Check if removing this element would break feasibility
                     temp_sol = ScQbfSolution(solution.elements.copy())
@@ -225,7 +232,7 @@ class ScQbfTS():
                 delta = self.evaluator.evaluate_exchange_delta(cand_in, cand_out, solution)  
                 
                 aspiration_criterion = current_objfun_val + delta > best_objfun_val
-                if (cand_in not in self.tabu_list and cand_out not in self.tabu_list) or aspiration_criterion:
+                if (cand_in not in self.tabu_list and cand_out not in self.tabu_list and cand_out not in self._fixed_elements) or aspiration_criterion:
                     if delta > best_delta:
                         # Check if removing this element would break feasibility
                         temp_sol = ScQbfSolution(solution.elements.copy())
@@ -288,7 +295,7 @@ class ScQbfTS():
                 delta = self.evaluator.evaluate_removal_delta(cand_out, solution)  
                 
                 aspiration_criterion = current_objfun_val + delta > best_objfun_val
-                if cand_out not in self.tabu_list or aspiration_criterion:
+                if (cand_out not in self.tabu_list and cand_out not in self._fixed_elements) or aspiration_criterion:
                     if delta > 0:
                         # Check if removing this element would break feasibility
                         temp_sol = ScQbfSolution(solution.elements.copy())
@@ -307,7 +314,7 @@ class ScQbfTS():
                     delta = self.evaluator.evaluate_exchange_delta(cand_in, cand_out, solution)  
                     
                     aspiration_criterion = current_objfun_val + delta > best_objfun_val
-                    if (cand_in not in self.tabu_list and cand_out not in self.tabu_list) or aspiration_criterion:
+                    if (cand_in not in self.tabu_list and cand_out not in self.tabu_list and cand_out not in self._fixed_elements) or aspiration_criterion:
                         if delta > 0:
                             # Check if removing this element would break feasibility
                             temp_sol = ScQbfSolution(solution.elements.copy())
