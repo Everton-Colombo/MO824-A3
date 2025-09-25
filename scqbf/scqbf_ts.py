@@ -13,9 +13,13 @@ class RestartIntensificationComponent():
     def __init__(self, instance: ScQbfInstance = None, restart_patience: int = 100, max_fixed_elements: int = 3):
         self._instance = instance
         
-        self.recency_memory: List[int] = [0] * instance.n
+        self.recency_memory: List[int] = None
         self.restart_patience = restart_patience
         self.max_fixed_elements = max_fixed_elements
+    
+    def set_instance(self, instance: ScQbfInstance):
+        self._instance = instance
+        self.recency_memory = [0] * instance.n
 
     def update_recency_memory(self, best_solution: ScQbfSolution):
         elements_in_solution = set(best_solution.elements)
